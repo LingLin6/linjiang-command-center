@@ -1,0 +1,23 @@
+[Unit]
+Description=OpenClaw Relay Client
+After=network.target
+
+[Service]
+Type=simple
+User=linglin
+WorkingDirectory=/home/linglin/.openclaw/workspace/projects/linjiang-command-center/src/openclaw-relay-client
+ExecStart=/usr/bin/node index.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# 环境变量
+Environment="NODE_ENV=production"
+
+# 安全加固
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

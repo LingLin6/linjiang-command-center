@@ -1,0 +1,22 @@
+# Android build
+src/android/.gradle/
+src/android/build/
+src/android/app/build/
+src/android/local.properties
+src/android/.idea/
+
+# Node modules
+node_modules/
+src/openclaw-relay-client/node_modules/
+
+# OS
+.DS_Store
+*.swp
+*.swo
+
+# APK (too large for git)
+*.apk
+
+# Temp
+/tmp/
+*.log

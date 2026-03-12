@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>翎绛指挥中心 UI Prototype</title>
+<style>
+/* ========== 设计哲学 ==========
+ * 老子：无为而治 — 信息主动找你，不是你找信息
+ * 香农：最大化信息密度 — 一眼消除所有不确定性
+ * 深泽直人：无意识设计 — 交互自然到你不觉得在操作
+ * 塔夫特：数据墨水比 → 每个像素都承载意义
+ * 迪特·拉姆斯：好设计是尽可能少的设计
+ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg-deep: #0a0b0f;
+  --bg-card: #12141a;
+  --bg-card-hover: #1a1d26;
+  --bg-surface: #181b24;
+  --text-primary: #e8eaed;
+  --text-secondary: #8b8f98;
+  --text-dim: #5a5e68;
+  --accent: #c9785c;       /* 绛色 — 翎绛的颜色 */
+  --accent-glow: #c9785c33;
+  --green: #34d399;
+  --green-dim: #34d39933;
+  --yellow: #fbbf24;
+  --yellow-dim: #fbbf2433;
+  --red: #f87171;
+  --red-dim: #f8717133;
+  --blue: #60a5fa;
+  --border: #ffffff0a;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --font: -apple-system, 'SF Pro Display', 'PingFang SC', sans-serif;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  max-width: 420px;
+  margin: 0 auto;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ========== 顶部状态栏 ========== */
+/* 老子："不言之教" — 状态栏不需要标签，颜色即语言 */
+.status-bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg-deep);
+  padding: 12px 20px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.status-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.85); }
+}
+
+.status-bar h1 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+.status-bar h1 span {
+  color: var(--accent);
+}
+
+.status-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--green-dim);
+  color: var(--green);
+}
+
+/* ========== 态势总览 ========== */
+/* 香农：这一块是全屏信息密度最高的区域 
+ * 3个数字消除3个最大的不确定性：
+ * 1. 有多少实例在线？（一切正常吗）
+ * 2. 有多少任务在跑？（在忙什么）
+ * 3. 有没有告警？（需要我介入吗）
+ */
+.overview {
+  padding: 8px 20px 16px;
+  display: flex;
+  gap: 10px;
+}
+
+.overview-card {
+  flex: 1;
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  text-align: center;
+  border: 1px solid var(--border);
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.overview-card:active {
+  transform: scale(0.96);
+  background: var(--bg-card-hover);
+}
+
+.overview-number {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.overview-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.overview-card.healthy .overview-number { color: var(--green); }
+.overview-card.busy .overview-number { color: var(--blue); }
+.overview-card.alert .overview-number { color: var(--yellow); }
+.overview-card.danger .overview-number { color: var(--red); }
+
+/* ========== 实例状态条 ========== */
+/* 塔夫特：小多样 (Small Multiples) — 重复的小图案比一个大图更高效 */
+.instances-strip {
+  padding: 0 20px 16px;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.instances-strip::-webkit-scrollbar { display: none; }
+
+.instance-chip {
+  flex-shrink: 0;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  min-width: 160px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.instance-chip:active {
+  transform: scale(0.97);
+}
+
+.instance-chip.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.instance-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.instance-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.instance-name {
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.instance-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.instance-metrics {
+  display: flex;
+  gap: 12px;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.metric-value {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.metric-label {
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* 资源条 — 比数字更直觉 */
+.resource-bar {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.resource-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+/* ========== 活跃任务流 ========== */
+/* 深泽直人：你最想知道的，放在你最容易看到的地方
+ * 不是"有哪些 sub-agent"，而是"现在在发生什么"
+ */
+.section-header {
+  padding: 8px 20px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.section-action {
+  font-size: 12px;
+  color: var(--accent);
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.task-stream {
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.task-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 16px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.task-card:active {
+  transform: scale(0.98);
+  background: var(--bg-card-hover);
+}
+
+.task-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.task-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.task-icon.running {
+  background: var(--blue);
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+}
+
+.task-icon.success {
+  background: var(--green-dim);
+}
+
+.task-icon.failed {
+  background: var(--red-dim);
+}
+
+.task-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.task-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-instance-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--accent-glow);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.task-time {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* 进度条 */
+.task-progress {
+  margin-top: 10px;
+}
+
+.progress-bar {
+  height: 4px;
+  background: var(--bg-deep);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+}
+
+.progress-fill.indeterminate {
+  width: 30% !important;
+  animation: indeterminate 1.5s ease-in-out infinite;
+}
+
+@keyframes indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+.progress-text {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* ========== 快捷指令面板 ========== */
+/* 拉姆斯："好设计是尽可能少的设计"
+ * 4个最高频操作，不多不少 
+ */
+.quick-actions {
+  padding: 20px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.quick-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.quick-btn:active {
+  transform: scale(0.93);
+  background: var(--bg-card-hover);
+  border-color: var(--accent);
+}
+
+.quick-btn-icon {
+  font-size: 22px;
+  margin-bottom: 6px;
+}
+
+.quick-btn-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ========== 时间线 ========== */
+.timeline {
+  padding: 0 20px 100px;
+}
+
+.timeline-item {
+  display: flex;
+  gap: 14px;
+  padding: 10px 0;
+  position: relative;
+}
+
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 34px;
+  bottom: -10px;
+  width: 1px;
+  background: var(--border);
+}
+
+.timeline-item:last-child::before {
+  display: none;
+}
+
+.timeline-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.timeline-content {
+  flex: 1;
+}
+
+.timeline-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.timeline-text strong {
+  font-weight: 600;
+}
+
+.timeline-timestamp {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* ========== 底部导航 ========== */
+/* 三个入口就够了：态势（看）、对话（说）、我（设置）
+ * 超过4个标签就是设计失败 */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-deep);
+  border-top: 1px solid var(--border);
+  display: flex;
+  padding: 8px 0 28px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 0;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.nav-item.active .nav-icon {
+  color: var(--accent);
+}
+
+.nav-item.active .nav-label {
+  color: var(--accent);
+}
+
+.nav-icon {
+  font-size: 20px;
+  color: var(--text-dim);
+}
+
+.nav-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.nav-badge {
+  position: absolute;
+  top: 2px;
+  right: calc(50% - 18px);
+  background: var(--red);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 8px;
+  min-width: 16px;
+  text-align: center;
+}
+
+/* ========== 中间对话按钮 ========== */
+.nav-item.chat-btn .nav-icon {
+  width: 44px;
+  height: 44px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: white;
+  box-shadow: 0 4px 16px var(--accent-glow);
+  margin-top: -20px;
+}
+
+/* ========== 动画 ========== */
+.fade-in {
+  animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+
+/* ========== 告警横幅 ========== */
+.alert-banner {
+  margin: 0 20px 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--yellow-dim);
+  border: 1px solid #fbbf2422;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.alert-banner:active {
+  transform: scale(0.98);
+}
+
+.alert-banner-icon {
+  font-size: 18px;
+}
+
+.alert-banner-text {
+  flex: 1;
+  font-size: 13px;
+  color: var(--yellow);
+  font-weight: 500;
+}
+
+.alert-banner-time {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* Swipe hint */
+.swipe-hint {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 4px 0 8px;
+}
+</style>
+</head>
+<body>
+
+<!-- 状态栏：一个呼吸的绿点 = 一切正常。不需要文字确认。 -->
+<div class="status-bar">
+  <div class="status-bar-left">
+    <div class="pulse-dot"></div>
+    <h1>翎<span>绛</span>指挥中心</h1>
+  </div>
+  <div class="status-bar-right">
+    <div class="status-pill">
+      <span>●</span> 全部在线
+    </div>
+  </div>
+</div>
+
+<!-- 态势总览：3个数字回答3个最大的问题 -->
+<div class="overview fade-in">
+  <div class="overview-card healthy" onclick="this.style.transform='scale(0.96)';setTimeout(()=>this.style.transform='',150)">
+    <div class="overview-number">2</div>
+    <div class="overview-label">实例在线</div>
+  </div>
+  <div class="overview-card busy" onclick="this.style.transform='scale(0.96)';setTimeout(()=>this.style.transform='',150)">
+    <div class="overview-number">3</div>
+    <div class="overview-label">任务执行中</div>
+  </div>
+  <div class="overview-card alert" onclick="this.style.transform='scale(0.96)';setTimeout(()=>this.style.transform='',150)">
+    <div class="overview-number">1</div>
+    <div class="overview-label">待处理告警</div>
+  </div>
+</div>
+
+<!-- 告警横幅：最紧急的信息浮到最上面 -->
+<div class="alert-banner fade-in stagger-1">
+  <span class="alert-banner-icon">⚠️</span>
+  <span class="alert-banner-text">翎绛 磁盘使用 90%，建议清理</span>
+  <span class="alert-banner-time">5分钟前</span>
+</div>
+
+<!-- 实例条：横滑卡片，每个实例一张"生命体征"卡 -->
+<div class="section-header fade-in stagger-2">
+  <span class="section-title">实例</span>
+  <span class="section-action">管理 →</span>
+</div>
+
+<div class="instances-strip fade-in stagger-2">
+  <!-- 翎绛 -->
+  <div class="instance-chip active">
+    <div class="instance-header">
+      <div class="instance-avatar" style="background:linear-gradient(135deg,#c9785c,#b85a3e)">🪶</div>
+      <span class="instance-name">翎绛</span>
+      <div class="instance-status-dot" style="background:var(--green);box-shadow:0 0 6px var(--green)"></div>
+    </div>
+    <div class="instance-metrics">
+      <div class="metric">
+        <span class="metric-value" style="color:var(--green)">12%</span>
+        <span class="metric-label">CPU</span>
+      </div>
+      <div class="metric">
+        <span class="metric-value">4.2G</span>
+        <span class="metric-label">MEM</span>
+      </div>
+      <div class="metric">
+        <span class="metric-value" style="color:var(--yellow)">90%</span>
+        <span class="metric-label">DISK</span>
+      </div>
+    </div>
+    <div class="resource-bar">
+      <div class="resource-bar-fill" style="width:90%;background:var(--yellow)"></div>
+    </div>
+  </div>
+
+  <!-- 翎翼 -->
+  <div class="instance-chip">
+    <div class="instance-header">
+      <div class="instance-avatar" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8)">🦅</div>
+      <span class="instance-name">翎翼</span>
+      <div class="instance-status-dot" style="background:var(--green);box-shadow:0 0 6px var(--green)"></div>
+    </div>
+    <div class="instance-metrics">
+      <div class="metric">
+        <span class="metric-value" style="color:var(--green)">8%</span>
+        <span class="metric-label">CPU</span>
+      </div>
+      <div class="metric">
+        <span class="metric-value">2.1G</span>
+        <span class="metric-label">MEM</span>
+      </div>
+      <div class="metric">
+        <span class="metric-value" style="color:var(--green)">45%</span>
+        <span class="metric-label">DISK</span>
+      </div>
+    </div>
+    <div class="resource-bar">
+      <div class="resource-bar-fill" style="width:45%;background:var(--green)"></div>
+    </div>
+  </div>
+
+  <!-- 翎云 -->
+  <div class="instance-chip">
+    <div class="instance-header">
+      <div class="instance-avatar" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed)">☁️</div>
+      <span class="instance-name">翎云</span>
+      <div class="instance-status-dot" style="background:var(--text-dim)"></div>
+    </div>
+    <div class="instance-metrics">
+      <div class="metric">
+        <span class="metric-value" style="color:var(--text-dim)">—</span>
+        <span class="metric-label">CPU</span>
+      </div>
+      <div class="metric">
+        <span class="metric-value" style="color:var(--text-dim)">—</span>
+        <span class="metric-label">MEM</span>
+      </div>
+      <div class="metric">
+        <span class="metric-value" style="color:var(--text-dim)">—</span>
+        <span class="metric-label">DISK</span>
+      </div>
+    </div>
+    <div class="resource-bar">
+      <div class="resource-bar-fill" style="width:0%"></div>
+    </div>
+  </div>
+</div>
+
+<div class="swipe-hint">← 左滑查看更多 →</div>
+
+<!-- 活跃任务：不是 sub-agent 列表，是"正在发生什么" -->
+<div class="section-header fade-in stagger-3">
+  <span class="section-title">活跃任务</span>
+  <span class="section-action">全部 →</span>
+</div>
+
+<div class="task-stream fade-in stagger-3">
+  <!-- 正在执行的任务 -->
+  <div class="task-card">
+    <div class="task-card-top">
+      <div class="task-icon running">⚡</div>
+      <div class="task-info">
+        <div class="task-title">
+          FBX 武器标注测试
+          <span class="task-instance-tag">翎绛</span>
+        </div>
+        <div class="task-meta">
+          <span>sub-agent #a7f3</span>
+          <span>·</span>
+          <span>已运行 4m23s</span>
+        </div>
+      </div>
+    </div>
+    <div class="task-progress">
+      <div class="progress-bar">
+        <div class="progress-fill" style="width:65%"></div>
+      </div>
+      <div class="progress-text">
+        <span>测试执行中...</span>
+        <span>65%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 正在执行的任务 2 -->
+  <div class="task-card">
+    <div class="task-card-top">
+      <div class="task-icon running">📝</div>
+      <div class="task-info">
+        <div class="task-title">
+          记忆维护
+          <span class="task-instance-tag">翎绛</span>
+        </div>
+        <div class="task-meta">
+          <span>sub-agent #b2e1</span>
+          <span>·</span>
+          <span>已运行 1m12s</span>
+        </div>
+      </div>
+    </div>
+    <div class="task-progress">
+      <div class="progress-bar">
+        <div class="progress-fill indeterminate" style="width:30%"></div>
+      </div>
+      <div class="progress-text">
+        <span>提炼日志中...</span>
+        <span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 刚完成的任务 -->
+  <div class="task-card" style="opacity:0.7">
+    <div class="task-card-top">
+      <div class="task-icon success">✅</div>
+      <div class="task-info">
+        <div class="task-title">意识迁移系统安全审查</div>
+        <div class="task-meta">
+          <span style="color:var(--green)">完成</span>
+          <span>·</span>
+          <span>耗时 12m</span>
+          <span>·</span>
+          <span>3分钟前</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 快捷指令：4个最高频操作 -->
+<div class="section-header fade-in stagger-4">
+  <span class="section-title">快捷指令</span>
+</div>
+
+<div class="quick-actions fade-in stagger-4">
+  <div class="quick-btn">
+    <div class="quick-btn-icon">🚀</div>
+    <div class="quick-btn-label">派发任务</div>
+  </div>
+  <div class="quick-btn">
+    <div class="quick-btn-icon">🔍</div>
+    <div class="quick-btn-label">搜记忆</div>
+  </div>
+  <div class="quick-btn">
+    <div class="quick-btn-icon">📊</div>
+    <div class="quick-btn-label">每日总结</div>
+  </div>
+  <div class="quick-btn">
+    <div class="quick-btn-icon">🛠️</div>
+    <div class="quick-btn-label">全体自检</div>
+  </div>
+</div>
+
+<!-- 今日时间线 -->
+<div class="section-header fade-in stagger-5">
+  <span class="section-title">今日动态</span>
+  <span class="section-action">全部 →</span>
+</div>
+
+<div class="timeline fade-in stagger-5">
+  <div class="timeline-item">
+    <div class="timeline-dot" style="background:var(--green-dim)">✅</div>
+    <div class="timeline-content">
+      <div class="timeline-text"><strong>翎绛</strong> 完成了 指挥中心 v0.7.1 构建</div>
+      <div class="timeline-timestamp">15:35</div>
+    </div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-dot" style="background:var(--yellow-dim)">⚠️</div>
+    <div class="timeline-content">
+      <div class="timeline-text"><strong>翎绛</strong> 磁盘使用率达到 90%</div>
+      <div class="timeline-timestamp">15:20</div>
+    </div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-dot" style="background:var(--blue);color:white;font-size:9px">🔒</div>
+    <div class="timeline-content">
+      <div class="timeline-text"><strong>中继服务器</strong> WSS 加密端口启动 (8443)</div>
+      <div class="timeline-timestamp">15:06</div>
+    </div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-dot" style="background:var(--green-dim)">🚀</div>
+    <div class="timeline-content">
+      <div class="timeline-text"><strong>翎绛</strong> 部署了流式输出三端改造</div>
+      <div class="timeline-timestamp">14:00</div>
+    </div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-dot" style="background:var(--accent-glow);color:var(--accent)">💤</div>
+    <div class="timeline-content">
+      <div class="timeline-text"><strong>翎翼</strong> 待命中，无活跃任务</div>
+      <div class="timeline-timestamp">08:00</div>
+    </div>
+  </div>
+</div>
+
+<!-- 底部导航 -->
+<div class="bottom-nav">
+  <div class="nav-item active">
+    <span class="nav-icon">📡</span>
+    <span class="nav-label">态势</span>
+  </div>
+  <div class="nav-item">
+    <span class="nav-icon">📋</span>
+    <span class="nav-label">任务</span>
+    <span class="nav-badge">3</span>
+  </div>
+  <div class="nav-item chat-btn">
+    <span class="nav-icon">💬</span>
+    <span class="nav-label" style="margin-top:4px">对话</span>
+  </div>
+  <div class="nav-item">
+    <span class="nav-icon">🧠</span>
+    <span class="nav-label">记忆</span>
+  </div>
+  <div class="nav-item">
+    <span class="nav-icon">⚙️</span>
+    <span class="nav-label">设置</span>
+  </div>
+</div>
+
+</body>
+</html>

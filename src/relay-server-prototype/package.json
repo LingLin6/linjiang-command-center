@@ -1,0 +1,20 @@
+{
+  "name": "openclaw-relay-server",
+  "version": "1.1.0",
+  "description": "OpenClaw Relay Server - Message routing between Android App and OpenClaw instances",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "pm2:start": "pm2 start server.js --name openclaw-relay",
+    "pm2:stop": "pm2 stop openclaw-relay",
+    "pm2:restart": "pm2 restart openclaw-relay",
+    "pm2:logs": "pm2 logs openclaw-relay"
+  },
+  "keywords": ["openclaw", "relay", "websocket", "server"],
+  "author": "翎绛",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

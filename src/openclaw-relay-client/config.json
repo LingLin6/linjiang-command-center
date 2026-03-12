@@ -1,0 +1,14 @@
+{
+  "relayUrl": "wss://api.lingjiangapp.online:8443",
+  "instanceId": "openclaw-vm-main",
+  "instanceName": "翎绛",
+  "instanceNickname": "虚拟机主实例",
+  "instanceEmoji": "🪶",
+  "instanceRole": "统帅",
+  "openclawApiUrl": "http://127.0.0.1:18789",
+  "openclawToken": "c967680d0c039aa402fc3017ed6f2f0c88ea1e0338aeff3c",
+  "heartbeatInterval": 30000,
+  "reconnectDelay": 5000,
+  "maxReconnectDelay": 60000,
+  "reconnectBackoff": 1.5
+}

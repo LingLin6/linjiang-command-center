@@ -1,0 +1,16 @@
+{
+  "name": "openclaw-relay-client",
+  "version": "1.0.0",
+  "description": "OpenClaw Relay Client - Connect OpenClaw instance to relay server",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test.js"
+  },
+  "keywords": ["openclaw", "relay", "websocket"],
+  "author": "翎绛",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
