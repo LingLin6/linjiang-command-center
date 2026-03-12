@@ -35,7 +35,8 @@ import com.linjiang.command.viewmodel.InstanceViewModel
  */
 @Composable
 fun SettingsScreen(
-    instanceViewModel: InstanceViewModel = viewModel()
+    instanceViewModel: InstanceViewModel = viewModel(),
+    onLogout: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val instances by instanceViewModel.instances.collectAsState()
@@ -260,6 +261,65 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+        }
+        
+        // ═══ 退出登录 ═══
+        item {
+            var showConfirmDialog by remember { mutableStateOf(false) }
+            
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(0.5.dp, StatusRed.copy(alpha = 0.2f), RoundedCornerShape(20.dp)),
+                shape = RoundedCornerShape(20.dp),
+                color = BgCard.copy(alpha = 0.85f),
+                shadowElevation = 4.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showConfirmDialog = true }
+                        .padding(14.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "退出登录",
+                        fontSize = 14.sp,
+                        color = StatusRed,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+            
+            if (showConfirmDialog) {
+                AlertDialog(
+                    onDismissRequest = { showConfirmDialog = false },
+                    title = {
+                        Text("退出登录", color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                    },
+                    text = {
+                        Text("退出后需要重新输入接入码", color = TextSecondary, fontSize = 14.sp)
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showConfirmDialog = false
+                            context.getSharedPreferences("linjiang_command", Context.MODE_PRIVATE)
+                                .edit().remove("access_code").apply()
+                            onLogout()
+                        }) {
+                            Text("确认退出", color = StatusRed)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showConfirmDialog = false }) {
+                            Text("取消", color = TextSecondary)
+                        }
+                    },
+                    containerColor = BgElevated,
+                    shape = RoundedCornerShape(20.dp)
+                )
             }
         }
         

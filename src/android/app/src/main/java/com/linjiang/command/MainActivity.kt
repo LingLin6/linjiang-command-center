@@ -1,5 +1,6 @@
 package com.linjiang.command
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -25,6 +27,7 @@ import com.linjiang.command.ui.screens.InstanceListScreen
 import com.linjiang.command.ui.screens.MemoryScreen
 import com.linjiang.command.ui.screens.SettingsScreen
 import com.linjiang.command.ui.screens.TaskScreen
+import com.linjiang.command.ui.screens.WelcomeScreen
 import com.linjiang.command.ui.theme.*
 import com.linjiang.command.viewmodel.ChatViewModel
 import com.linjiang.command.viewmodel.DashboardViewModel
@@ -45,7 +48,26 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             LinjiangCommandTheme {
-                MainScreen(onChatViewModelReady = { chatViewModel = it })
+                val context = LocalContext.current
+                val prefs = context.getSharedPreferences("linjiang_command", Context.MODE_PRIVATE)
+                var isAuthenticated by remember {
+                    mutableStateOf(prefs.getString("access_code", null) != null)
+                }
+
+                if (isAuthenticated) {
+                    MainScreen(
+                        onChatViewModelReady = { chatViewModel = it },
+                        onLogout = {
+                            prefs.edit().remove("access_code").apply()
+                            isAuthenticated = false
+                        }
+                    )
+                } else {
+                    WelcomeScreen(onAuthenticated = { code ->
+                        prefs.edit().putString("access_code", code).apply()
+                        isAuthenticated = true
+                    })
+                }
             }
         }
     }
@@ -74,7 +96,7 @@ private enum class MainTab(val icon: String, val label: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(onChatViewModelReady: (ChatViewModel) -> Unit = {}) {
+fun MainScreen(onChatViewModelReady: (ChatViewModel) -> Unit = {}, onLogout: () -> Unit = {}) {
     val instanceViewModel: InstanceViewModel = viewModel()
     val chatViewModel: ChatViewModel = viewModel()
     val dashboardViewModel: DashboardViewModel = viewModel()
@@ -375,7 +397,7 @@ fun MainScreen(onChatViewModelReady: (ChatViewModel) -> Unit = {}) {
                     )
                 }
                 MainTab.SETTINGS -> {
-                    SettingsScreen(instanceViewModel = instanceViewModel)
+                    SettingsScreen(instanceViewModel = instanceViewModel, onLogout = onLogout)
                 }
             }
         }

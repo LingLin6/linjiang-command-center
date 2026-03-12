@@ -1,3 +1,19 @@
+## v0.13.0 (2026-03-12)
+- 新增：R010 流式过程 UI — 对话中实时展示 AI 处理过程
+  - 🧠 思考动画（暖金脉冲 + 思考内容预览，3 行 ellipsis）
+  - 🔧 工具调用卡片（左侧状态色条 + 旋转/完成/失败指示 + summary）
+  - ⏳ 超时预警横幅（80% 黄色警告，超时红色 + 重试按钮）
+  - ❌ 错误卡片 + 重试按钮
+  - 新增 6 个 Composable 组件：ProcessStatusCard/ThinkingCard/ToolCallCard/ToolCallingCards/TimeoutBanner/ErrorCard
+- 新增：R006 接入认证 — App 首次使用需输入接入码
+  - WelcomeScreen 欢迎页（🪶 呼吸动画 + 密码输入框 + 绛红暖光风格）
+  - 默认接入码：`linjiang2026`（本地硬编码校验）
+  - 设置页"退出登录"按钮（清除接入码 + 确认 Dialog）
+  - SharedPreferences 持久化（`linjiang_command` / `access_code`）
+- 改进：中继服务器 process_update 消息透传（加入 switch case）
+- 改进：构建脚本强制文档更新检查（CHANGELOG + PROJECT 必须在最近 commit 中）
+- 完成：M8.5 体验基础里程碑（R010/R004/R005/R006 全部完成）
+
 ## v0.12.0 (2026-03-10)
 - 重设计：全 App 科幻毛玻璃风格（JARVIS / Vision Pro 风格）
 - 重做：背景色体系从死黑 #0a0b0f → 深蓝灰 #0D1520（有温度的暗色）
