@@ -570,6 +570,7 @@ function handleConnection(ws) {
         case 'stream_start':
         case 'stream_chunk':
         case 'stream_end':
+        case 'process_update':
           handleStreamMessage(clientId, client, msg);
           break;
           

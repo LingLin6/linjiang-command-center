@@ -92,5 +92,10 @@ Android App ←WSS→ 中继服务器（翎云）←WS→ OpenClaw 客户端（V
 
 ---
 
+## 发布规则
+- **发 APK 前必须先 git commit + push**，没有例外
+- 构建脚本 `scripts/build-and-ship.sh` 强制执行此规则
+- 直接 `gradlew assembleDebug` 不会被阻止，但发给翎麟前必须走脚本
+
 **创建时间**: 2026-03-08
 **负责人**: 翎绛 🪶

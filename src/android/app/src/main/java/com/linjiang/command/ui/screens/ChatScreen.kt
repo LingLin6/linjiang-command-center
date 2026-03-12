@@ -24,17 +24,25 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import com.linjiang.command.data.HealthAlert
 import com.linjiang.command.data.model.AiThinkingState
 import com.linjiang.command.data.model.Message
 import com.linjiang.command.data.model.MessageLifeState
+import com.linjiang.command.data.model.MessageProcessContext
 import com.linjiang.command.data.model.MessageType
+import com.linjiang.command.data.model.ProcessPhase
+import com.linjiang.command.data.model.ToolCallRecord
+import com.linjiang.command.data.model.ToolStatus
 import com.linjiang.command.data.model.SubAgent
 import com.linjiang.command.data.model.toDisplayText
 import com.linjiang.command.data.model.toIcon
@@ -58,6 +66,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
     val aiThinkingState by viewModel.aiThinkingState.collectAsState()
     val instanceName by viewModel.currentInstanceName.collectAsState()
     val instanceEmoji by viewModel.currentInstanceEmoji.collectAsState()
+    val activeProcess by viewModel.activeProcess.collectAsState()
     
     var inputText by remember { mutableStateOf("") }
     var showSubAgentsSheet by remember { mutableStateOf(false) }
@@ -277,6 +286,18 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             onRetry = { viewModel.retryMessage(item.message.id) }
                         )
                         is ItemWrapper.NotificationItem -> NotificationCard(notification = item.notification)
+                    }
+                }
+            }
+            
+            // 流式过程 UI
+            activeProcess?.let { process ->
+                if (process.phase != ProcessPhase.IDLE && process.phase != ProcessPhase.COMPLETE) {
+                    item {
+                        ProcessStatusCard(
+                            process = process,
+                            onRetry = { viewModel.sendMessage(messages.lastOrNull { it.type == MessageType.USER }?.content ?: "") }
+                        )
                     }
                 }
             }
@@ -789,4 +810,326 @@ fun QuickCommandChip(label: String, onClick: () -> Unit) {
 private fun formatTimestamp(timestamp: Long): String {
     val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
     return sdf.format(Date(timestamp))
+}
+
+// ══════════════════════════════════════════
+// 流式过程 UI 组件
+// ══════════════════════════════════════════
+
+/**
+ * 过程状态卡片 — 根据 ProcessPhase 显示不同 UI
+ */
+@Composable
+fun ProcessStatusCard(
+    process: MessageProcessContext,
+    onRetry: () -> Unit = {}
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // 超时警告横幅（在任意阶段都可能出现）
+        val showTimeoutWarning = process.timeoutLimit > 0 &&
+            process.elapsedSeconds > (process.timeoutLimit * 0.8).toInt() &&
+            process.phase != ProcessPhase.TIMEOUT &&
+            process.phase != ProcessPhase.ERROR
+        if (showTimeoutWarning) {
+            TimeoutBanner(
+                elapsed = process.elapsedSeconds,
+                isTimeout = false,
+                onRetry = {}
+            )
+        }
+
+        when (process.phase) {
+            ProcessPhase.THINKING -> ThinkingCard(thinkingText = process.thinkingText)
+            ProcessPhase.TOOL_CALLING -> ToolCallingCards(toolCalls = process.toolCalls)
+            ProcessPhase.STREAMING -> { /* 流式文本已由现有 stream_chunk 机制处理 */ }
+            ProcessPhase.TIMEOUT -> TimeoutBanner(
+                elapsed = process.elapsedSeconds,
+                isTimeout = true,
+                onRetry = onRetry
+            )
+            ProcessPhase.ERROR -> ErrorCard(onRetry = onRetry)
+            else -> {}
+        }
+    }
+}
+
+/**
+ * 思考动画卡片 — 🧠 脉冲点 + 可选思考内容
+ */
+@Composable
+private fun ThinkingCard(thinkingText: String) {
+    val infiniteTransition = rememberInfiniteTransition(label = "process_thinking")
+
+    // 3 个点的呼吸脉冲，各自错开
+    val dot1Alpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600, delayMillis = 0), repeatMode = RepeatMode.Reverse
+        ), label = "ptd1"
+    )
+    val dot2Alpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600, delayMillis = 200), repeatMode = RepeatMode.Reverse
+        ), label = "ptd2"
+    )
+    val dot3Alpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600, delayMillis = 400), repeatMode = RepeatMode.Reverse
+        ), label = "ptd3"
+    )
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(0.5.dp, WarmGlowBorder, RoundedCornerShape(12.dp)),
+        shape = RoundedCornerShape(12.dp),
+        color = BgCard
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(text = "🧠", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = "正在思考",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = WarmGlow,
+                    fontWeight = FontWeight.Medium
+                )
+                // 3 个脉冲点
+                Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    listOf(dot1Alpha, dot2Alpha, dot3Alpha).forEach { alpha ->
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(WarmGlow.copy(alpha = alpha))
+                        )
+                    }
+                }
+            }
+
+            // 思考内容（如果有）
+            if (thinkingText.isNotBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = thinkingText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 16.sp
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 工具调用卡片列表
+ */
+@Composable
+private fun ToolCallingCards(toolCalls: List<ToolCallRecord>) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        toolCalls.forEach { toolCall ->
+            ToolCallCard(toolCall = toolCall)
+        }
+    }
+}
+
+/**
+ * 单个工具调用卡片 — 左侧状态色条 + 工具名 + 状态指示
+ */
+@Composable
+private fun ToolCallCard(toolCall: ToolCallRecord) {
+    val statusColor = when (toolCall.status) {
+        ToolStatus.RUNNING -> StatusBlue
+        ToolStatus.SUCCESS -> StatusGreen
+        ToolStatus.FAILED -> StatusRed
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = BgCard
+    ) {
+        Row(modifier = Modifier.fillMaxWidth()) {
+            // 左侧状态色条
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .fillMaxHeight()
+                    .background(statusColor, RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp))
+            )
+
+            Column(modifier = Modifier.padding(10.dp).weight(1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 左侧：工具图标 + 名称
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(text = "🔧", style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            text = toolCall.tool,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 200.dp)
+                        )
+                    }
+
+                    // 右侧：状态指示
+                    when (toolCall.status) {
+                        ToolStatus.RUNNING -> {
+                            val rotationAngle by rememberInfiniteTransition(label = "tool_spin_${toolCall.callId}")
+                                .animateFloat(
+                                    initialValue = 0f, targetValue = 360f,
+                                    animationSpec = infiniteRepeatable(
+                                        animation = tween(1000, easing = LinearEasing)
+                                    ), label = "spin_${toolCall.callId}"
+                                )
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp).rotate(rotationAngle),
+                                strokeWidth = 1.5.dp,
+                                color = StatusBlue
+                            )
+                        }
+                        ToolStatus.SUCCESS -> {
+                            Text(text = "✅", style = MaterialTheme.typography.bodySmall)
+                        }
+                        ToolStatus.FAILED -> {
+                            Text(text = "❌", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+
+                // 摘要（如果有）
+                if (!toolCall.summary.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = toolCall.summary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 14.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 超时/警告横幅
+ */
+@Composable
+private fun TimeoutBanner(
+    elapsed: Int,
+    isTimeout: Boolean,
+    onRetry: () -> Unit
+) {
+    val bgColor = if (isTimeout) StatusRedDim else StatusYellowDim
+    val textColor = if (isTimeout) StatusRed else StatusYellow
+    val icon = if (isTimeout) "⏰" else "⏳"
+    val message = if (isTimeout) "任务超时" else "任务较大，已执行 ${elapsed}s"
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        color = bgColor
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(text = icon, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = textColor,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            if (isTimeout) {
+                TextButton(
+                    onClick = onRetry,
+                    colors = ButtonDefaults.textButtonColors(contentColor = Accent)
+                ) {
+                    Text("重试", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 错误状态卡片
+ */
+@Composable
+private fun ErrorCard(onRetry: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(0.5.dp, StatusRed.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
+        shape = RoundedCornerShape(12.dp),
+        color = StatusRedDim
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(text = "❌", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = "处理出错",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = StatusRed,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            TextButton(
+                onClick = onRetry,
+                colors = ButtonDefaults.textButtonColors(contentColor = Accent)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "重试",
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("重试", style = MaterialTheme.typography.labelMedium)
+            }
+        }
+    }
 }
