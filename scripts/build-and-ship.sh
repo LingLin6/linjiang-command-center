@@ -40,17 +40,18 @@ echo "✅ 已同步到 GitHub"
 echo ""
 echo "📝 Step 2: 检查技术文档..."
 
-LAST_COMMIT_FILES=$(git diff-tree --no-commit-id --name-only -r HEAD)
+# 检查最近 3 次 commit 中是否包含文档更新（允许分开提交）
+RECENT_FILES=$(git diff-tree --no-commit-id --name-only -r HEAD~3..HEAD 2>/dev/null || git diff-tree --no-commit-id --name-only -r HEAD)
 
-if ! echo "$LAST_COMMIT_FILES" | grep -q "docs/CHANGELOG.md"; then
-    echo "⚠️  警告：最近一次 commit 未更新 docs/CHANGELOG.md"
+if ! echo "$RECENT_FILES" | grep -q "docs/CHANGELOG.md"; then
+    echo "⚠️  警告：最近 3 次 commit 未更新 docs/CHANGELOG.md"
     echo "🚫 规则：每次发版必须更新 CHANGELOG"
     echo "请更新 CHANGELOG.md 后重新 commit + push"
     exit 1
 fi
 
-if ! echo "$LAST_COMMIT_FILES" | grep -q "PROJECT.md"; then
-    echo "⚠️  警告：最近一次 commit 未更新 PROJECT.md"
+if ! echo "$RECENT_FILES" | grep -q "PROJECT.md"; then
+    echo "⚠️  警告：最近 3 次 commit 未更新 PROJECT.md"
     echo "🚫 规则：里程碑状态变更必须更新 PROJECT.md"
     echo "请更新 PROJECT.md 后重新 commit + push"
     exit 1
